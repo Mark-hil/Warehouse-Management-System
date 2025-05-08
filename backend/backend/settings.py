@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'procurement_system',
     'shipment_tracking',
     'report_management',
+    'sales_management',
 ]
 
 MIDDLEWARE = [

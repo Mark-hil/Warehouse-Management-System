@@ -22,6 +22,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.routers import DefaultRouter
 from inventory_management.views import CategoryViewSet, ItemViewSet, WarehouseViewSet, InventoryViewSet, InventoryAuditViewSet
 from user_accounts.views import UserViewSet, PermissionViewSet, NotificationViewSet
+from sales_management.views import CustomerViewSet, SaleViewSet, PaymentViewSet, PriceHistoryViewSet
 
 router = DefaultRouter()
 router.register(r'inventory/categories', CategoryViewSet)
@@ -32,6 +33,10 @@ router.register(r'inventory/audit', InventoryAuditViewSet)
 router.register(r'users', UserViewSet)
 router.register(r'permissions', PermissionViewSet)
 router.register(r'notifications', NotificationViewSet)
+router.register(r'customers', CustomerViewSet)
+router.register(r'sales', SaleViewSet)
+router.register(r'payments', PaymentViewSet)
+router.register(r'price-history', PriceHistoryViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -42,4 +47,5 @@ urlpatterns = [
     path('api/shipment/', include('shipment_tracking.urls')),
     path('api/reports/', include('report_management.urls')),
     path('api-auth/', include('rest_framework.urls')),
+    path('api/sales/', include('sales_management.urls')),
 ]
