@@ -15,6 +15,7 @@ class Item(models.Model):
     description = models.TextField(blank=True, null=True)
     unit = models.CharField(max_length=50, default='unit')
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='items')
 
     class Meta:
         db_table = 'items'

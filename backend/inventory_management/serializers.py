@@ -7,9 +7,20 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ItemSerializer(serializers.ModelSerializer):
+    unitPrice = serializers.DecimalField(source='unit_price', max_digits=12, decimal_places=2)
+    unitMeasurement = serializers.CharField(source='unit', required=True)
+    category = CategorySerializer(read_only=True)
+    categoryId = serializers.PrimaryKeyRelatedField(
+        source='category',
+        queryset=Category.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+
     class Meta:
         model = Item
-        fields = '__all__'
+        fields = ['item_id', 'name', 'description', 'unitPrice', 'unitMeasurement', 'category', 'categoryId']
 
 class WarehouseSerializer(serializers.ModelSerializer):
     class Meta:
