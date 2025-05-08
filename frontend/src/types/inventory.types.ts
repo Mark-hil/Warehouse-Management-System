@@ -1,16 +1,14 @@
 export interface Category {
-  id: string;
+  category_id: number;
   name: string;
-  description: string;
-  createdAt: string;
-  updatedAt: string;
+  description: string | null;
 }
 
 export interface Item {
   id: string;
   name: string;
   description: string;
-  unitPrice: number;
+  unitPrice: string | number;
   unitMeasurement: string;
   categoryId: string;
   category?: Category;

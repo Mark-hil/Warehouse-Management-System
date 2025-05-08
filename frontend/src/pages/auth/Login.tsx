@@ -21,9 +21,9 @@ const Login: React.FC = () => {
 
     try {
       await login(credentials);
-      navigate('/dashboard');
+      navigate('/');
     } catch (err) {
-      setError('Invalid credentials');
+      setError(err instanceof Error ? err.message : 'Invalid credentials');
     } finally {
       setIsSubmitting(false);
     }

@@ -1,51 +1,36 @@
-import React, { useState } from 'react';
-import { Button, Form, Input, Select, Switch } from '../../components/forms';
+import React, { useState, useEffect } from 'react';
+import { Button, Form, Input, Select } from '../../components/forms';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { Dialog } from '../../components/overlays';
+import { userService } from '../../services/user.service';
+import { User, Permission, UserRole } from '../../types/auth.types';
 
-type Permission = 'read' | 'write' | 'manage_users' | 'manage_roles' | 'manage_settings' | 'all';
 
-interface User {
+
+interface RoleData {
   id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: 'active' | 'inactive';
-}
-
-interface NewUser {
-  name: string;
-  email: string;
-  role: string;
-  password: string;
-  status: 'active' | 'inactive';
-}
-
-interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: string[];
-}
-
-interface NewRole {
   name: string;
   description: string;
   permissions: Permission[];
 }
 
+interface NewRole extends Omit<RoleData, 'id'> {}
+
 const UsersAndRoles: React.FC = () => {
   const [showUserDialog, setShowUserDialog] = useState(false);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
-  
-  const [newUser, setNewUser] = useState<NewUser>({
-    name: '',
+  const [editingRole, setEditingRole] = useState<RoleData | null>(null);
+
+  const [newUser, setNewUser] = useState<Omit<User, 'id'> & { password: string }>({
+    username: '',
     email: '',
-    role: '',
-    password: '',
-    status: 'active'
+    role: 'team_lead',
+    is_active: true,
+    is_staff: false,
+    assigned_branch: '',
+    created_at: new Date().toISOString(),
+    password: ''
   });
 
   const [newRole, setNewRole] = useState<NewRole>({
@@ -63,86 +48,126 @@ const UsersAndRoles: React.FC = () => {
     'all'
   ];
 
-  // Sample data - replace with actual API calls
-  const [users] = useState<User[]>([
-    { id: '1', name: 'John Doe', email: 'john@warehouse.com', role: 'Admin', status: 'active' },
-    { id: '2', name: 'Jane Smith', email: 'jane@warehouse.com', role: 'Manager', status: 'active' },
-    { id: '3', name: 'Bob Wilson', email: 'bob@warehouse.com', role: 'Staff', status: 'inactive' },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
 
-  const [roles] = useState<Role[]>([
-    {
-      id: '1',
-      name: 'Admin',
-      description: 'Full system access',
-      permissions: ['all'],
-    },
-    {
-      id: '2',
-      name: 'Manager',
-      description: 'Department management access',
-      permissions: ['read', 'write', 'manage_users'],
-    },
-    {
-      id: '3',
-      name: 'Staff',
-      description: 'Basic access',
-      permissions: ['read', 'write'],
-    },
-  ]);
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const fetchedUsers = await userService.getUsers();
+        setUsers(fetchedUsers);
+      } catch (error) {
+        console.error('Failed to load users:', error);
+      }
+    };
+    loadUsers();
+  }, []);
+
+  const [roles, setRoles] = useState<RoleData[]>([]);
+
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const fetchedRoles = await userService.getRoles();
+        const mappedRoles: RoleData[] = fetchedRoles.map(role => ({
+          id: role,
+          name: role,
+          description: `${role} role`,
+          permissions: ['read']
+        }));
+        setRoles(mappedRoles);
+      } catch (error) {
+        console.error('Failed to load roles:', error);
+      }
+    };
+    loadRoles();
+  }, []);
+
+  const roleOptions: UserRole[] = ['admin', 'warehouse_manager', 'team_lead', 'approver'];
+
+  const capitalizeFirstLetter = (word: string): string => {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  };
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement user update
-    console.log('Updating user:', editingUser?.id, newUser);
-    setShowUserDialog(false);
-    setEditingUser(null);
-    setNewUser({
-      name: '',
-      email: '',
-      role: '',
-      password: '',
-      status: 'active'
-    });
+    if (!editingUser?.id) return;
+
+    try {
+      await userService.updateUser(editingUser.id, newUser);
+      const updatedUsers = await userService.getUsers();
+      setUsers(updatedUsers);
+      setShowUserDialog(false);
+      setEditingUser(null);
+      setNewUser({
+        username: '',
+        email: '',
+        role: 'team_lead',
+        is_active: true,
+        is_staff: false,
+        assigned_branch: '',
+        created_at: new Date().toISOString(),
+        password: ''
+      });
+    } catch (error) {
+      console.error('Failed to update user:', error);
+    }
   };
 
   const handleUpdateRole = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement role update
-    console.log('Updating role:', editingRole?.id, newRole);
-    setShowRoleDialog(false);
-    setEditingRole(null);
-    setNewRole({
-      name: '',
-      description: '',
-      permissions: []
-    });
+    if (!editingRole?.id) return;
+
+    try {
+      // TODO: Implement role update when API is ready
+      console.log('Updating role:', editingRole.id, newRole);
+      setShowRoleDialog(false);
+      setEditingRole(null);
+      setNewRole({
+        name: '',
+        description: '',
+        permissions: []
+      });
+    } catch (error) {
+      console.error('Failed to update role:', error);
+    }
   };
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement user creation
-    console.log('Creating user:', newUser);
-    setShowUserDialog(false);
-    setNewUser({
-      name: '',
-      email: '',
-      role: '',
-      password: '',
-      status: 'active'
-    });
+    try {
+      await userService.createUser(newUser);
+      const updatedUsers = await userService.getUsers();
+      setUsers(updatedUsers);
+      setShowUserDialog(false);
+      setNewUser({
+        username: '',
+        email: '',
+        role: 'team_lead',
+        is_active: true,
+        is_staff: false,
+        assigned_branch: '',
+        created_at: new Date().toISOString(),
+        password: ''
+      });
+    } catch (error) {
+      console.error('Failed to create user:', error);
+    }
   };
 
   const handleAddRole = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement role creation
-    console.log('Creating role:', newRole);
-    setShowRoleDialog(false);
-    setNewRole({
-      name: '',
-      description: '',
-      permissions: []
-    });
+    try {
+      // TODO: Implement role creation when API is ready
+      console.log('Creating role:', newRole);
+      setShowRoleDialog(false);
+      setNewRole({
+        name: '',
+        description: '',
+        permissions: []
+      });
+    } catch (error) {
+      console.error('Failed to create role:', error);
+    }
   };
 
   return (
@@ -174,14 +199,14 @@ const UsersAndRoles: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {users.map((user) => (
                 <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">{user.name}</td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{user.username}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{user.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{user.role}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {user.status}
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <span
+                      className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                    >
+                      {user.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -225,16 +250,16 @@ const UsersAndRoles: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {roles.map((role) => (
                 <tr key={role.id}>
-                  <td className="px-6 py-4 whitespace-nowrap font-medium">{role.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{role.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{role.description}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-wrap">
                       {role.permissions.map((permission) => (
                         <span
                           key={permission}
                           className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
                         >
-                          {permission}
+                          {capitalizeFirstLetter(permission.replace('_', ' '))}
                         </span>
                       ))}
                     </div>
@@ -262,8 +287,8 @@ const UsersAndRoles: React.FC = () => {
         <Form onSubmit={editingUser ? handleUpdateUser : handleAddUser} className="space-y-4">
           <Input
             label="Name"
-            value={newUser.name}
-            onChange={e => setNewUser({ ...newUser, name: e.target.value })}
+            value={newUser.username}
+            onChange={e => setNewUser({ ...newUser, username: e.target.value })}
             required
           />
           <Input
@@ -276,9 +301,41 @@ const UsersAndRoles: React.FC = () => {
           <Select
             label="Role"
             value={newUser.role}
-            onChange={value => setNewUser({ ...newUser, role: value })}
-            options={roles.map(role => ({ value: role.name, label: role.name }))}
-            required
+            onChange={value => setNewUser({ ...newUser, role: value as UserRole })}
+            options={roleOptions.map(role => ({
+              value: role,
+              label: capitalizeFirstLetter(role.replace('_', ' '))
+            }))}
+          />
+          <div className="mt-4 flex gap-4">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                name="is_active"
+                checked={newUser.is_active}
+                onChange={(e) => setNewUser({ ...newUser, is_active: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label className="ml-2 block text-sm text-gray-900">Active</label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                name="is_staff"
+                checked={newUser.is_staff}
+                onChange={(e) => setNewUser({ ...newUser, is_staff: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label className="ml-2 block text-sm text-gray-900">Staff</label>
+            </div>
+          </div>
+          <label className="block text-sm font-medium text-gray-700">Branch</label>
+          <input
+            type="text"
+            name="assigned_branch"
+            value={newUser.assigned_branch}
+            onChange={e => setNewUser({ ...newUser, assigned_branch: e.target.value })}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           />
           {!editingUser && (
             <Input
@@ -289,11 +346,6 @@ const UsersAndRoles: React.FC = () => {
               required
             />
           )}
-          <Switch
-            label="Active"
-            checked={newUser.status === 'active'}
-            onChange={checked => setNewUser({ ...newUser, status: checked ? 'active' : 'inactive' })}
-          />
           <div className="flex justify-end space-x-3 pt-4">
             <Button type="button" variant="secondary" onClick={() => setShowUserDialog(false)}>
               Cancel

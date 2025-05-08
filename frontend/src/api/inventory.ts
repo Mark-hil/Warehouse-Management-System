@@ -1,4 +1,5 @@
 import { Item, Category, Warehouse, Distribution } from '../types/inventory.types';
+import { api } from './api';
 
 interface InventoryStats {
   totalValue: number;
@@ -8,24 +9,31 @@ interface InventoryStats {
   urgentTasks: number;
 }
 
-const BASE_URL = '/api/inventory';
-
 export const getItems = async (): Promise<Item[]> => {
-  const response = await fetch(`${BASE_URL}/items`);
-  if (!response.ok) throw new Error('Failed to fetch items');
-  return response.json();
+  try {
+    return await api.get<Item[]>('/inventory/items/');
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    throw error;
+  }
 };
 
 export const getCategories = async (): Promise<Category[]> => {
-  const response = await fetch(`${BASE_URL}/categories`);
-  if (!response.ok) throw new Error('Failed to fetch categories');
-  return response.json();
+  try {
+    return await api.get<Category[]>('/inventory/categories/');
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    throw error;
+  }
 };
 
 export const getWarehouses = async (): Promise<Warehouse[]> => {
-  const response = await fetch(`${BASE_URL}/warehouses`);
-  if (!response.ok) throw new Error('Failed to fetch warehouses');
-  return response.json();
+  try {
+    return await api.get<Warehouse[]>('/inventory/warehouses/');
+  } catch (error) {
+    console.error('Error fetching warehouses:', error);
+    throw error;
+  }
 };
 
 export const getInventoryStats = async (): Promise<InventoryStats> => {
@@ -39,12 +47,29 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
   };
 };
 
-export const createDistribution = async (distribution: Omit<Distribution, 'id'>): Promise<Distribution> => {
-  const response = await fetch(`${BASE_URL}/distributions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(distribution),
-  });
-  if (!response.ok) throw new Error('Failed to create distribution');
-  return response.json();
+interface CreateItemData {
+  name: string;
+  description: string;
+  unitPrice: string | number;
+  unitMeasurement: string;
+  categoryId: string;
+}
+
+export const createItem = async (itemData: CreateItemData): Promise<Item> => {
+  try {
+    console.log('Sending data to server:', itemData);
+    const { data } = await api.post<{ data: Item }>('/inventory/items/', itemData);
+    console.log('Server response:', data);
+    return data as Item;
+  } catch (error: any) {
+    console.error('Error creating item:', error.response?.data || error);
+    if (error.response?.data) {
+      throw error.response.data;
+    }
+    throw { message: 'Failed to create item' };
+  }
+};
+
+export const createDistribution = async (data: Omit<Distribution, 'id'>): Promise<Distribution> => {
+  return await api.post<Distribution>('/inventory/distributions/', data);
 };

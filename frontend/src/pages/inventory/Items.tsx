@@ -1,9 +1,13 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, useEffect, useMemo } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Table, { Column } from '../../components/common/Table';
 import Modal from '../../components/common/Modal';
-import { Form, Input, Select, TextArea, Button } from '../../components/forms';
-import { Item } from '../../types/inventory.types';
+import { Form, Input, Select, TextArea } from '../../components/forms';
+import Button from '../../components/common/Button';
+import { Item, Category } from '../../types/inventory.types';
+import { getItems, createItem, getCategories } from '../../api/inventory';
+import { useAuth } from '../../context/AuthContext';
 
 const UNIT_OPTIONS = [
   { value: '', label: 'Select Unit' },
@@ -13,39 +17,73 @@ const UNIT_OPTIONS = [
   { value: 'box', label: 'Boxes' },
 ];
 
-const CATEGORY_OPTIONS = [
-  { value: '', label: 'All Categories' },
-  { value: 'category-1', label: 'Electronics' },
-  { value: 'category-2', label: 'Office Supplies' },
-  { value: 'category-3', label: 'Furniture' },
-  { value: 'category-4', label: 'Raw Materials' },
-  { value: 'category-5', label: 'Packaging' },
-];
-
 const Items: React.FC = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
+  
+  const categoryOptions = useMemo(() => [
+    { value: '', label: 'All Categories' },
+    ...categories.map(cat => ({
+      value: cat.category_id.toString(),
+      label: cat.name
+    }))
+  ], [categories]);
+
+  console.log('Category options:', categoryOptions);
+  const navigate = useNavigate();
+  const { state: authState } = useAuth();
+  const [items, setItems] = useState<Item[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  
-  // Mock data for demonstration
-  const items: Item[] = Array.from({ length: 20 }, (_, i) => ({
-    id: `item-${i + 1}`,
-    name: `Item ${i + 1}`,
-    description: `Description for Item ${i + 1}`,
-    unitPrice: Math.round(Math.random() * 1000) / 10,
-    unitMeasurement: ['pcs', 'kg', 'liter', 'box'][Math.floor(Math.random() * 4)],
-    categoryId: `category-${Math.floor(Math.random() * 5) + 1}`,
-    category: {
-      id: `category-${Math.floor(Math.random() * 5) + 1}`,
-      name: ['Electronics', 'Office Supplies', 'Furniture', 'Raw Materials', 'Packaging'][Math.floor(Math.random() * 5)],
-      description: 'Category description',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }));
-  
+  const [formState, setFormState] = useState({
+    name: '',
+    description: '',
+    unitPrice: '',
+    unitMeasurement: '',
+    categoryId: ''
+  });
+
+  const resetForm = () => {
+    setFormState({
+      name: '',
+      description: '',
+      unitPrice: '',
+      unitMeasurement: '',
+      categoryId: ''
+    });
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [itemsData, categoriesData] = await Promise.all([
+          getItems(),
+          getCategories()
+        ]);
+        setItems(itemsData);
+        setCategories(categoriesData);
+        setError(null);
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('401')) {
+          navigate('/login');
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to fetch data');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (authState.isAuthenticated) {
+      fetchData();
+    } else {
+      navigate('/login');
+    }
+  }, [authState.isAuthenticated, navigate]);
+
   const filteredItems = items.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -54,6 +92,7 @@ const Items: React.FC = () => {
   
   const handleAddItem = () => {
     setSelectedItem(null);
+    resetForm();
     setIsModalOpen(true);
   };
   
@@ -72,17 +111,48 @@ const Items: React.FC = () => {
     console.log('Delete item', item);
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Save item
-    console.log('Save item', selectedItem);
-    setIsModalOpen(false);
+    try {
+      const { name, unitPrice, unitMeasurement, categoryId } = formState;
+      
+      if (!name || !unitPrice || !unitMeasurement || !categoryId) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      const itemData = {
+        name,
+        description: formState.description,
+        unitPrice: parseFloat(unitPrice),
+        unitMeasurement,
+        categoryId
+      };
+
+      console.log('Submitting data:', itemData);
+      
+      // Create the item
+      await createItem(itemData);
+      
+      // Reset form
+      resetForm();
+      
+      // Close modal
+      setIsModalOpen(false);
+      
+      // Refresh items list
+      const updatedItems = await getItems();
+      setItems(updatedItems);
+    } catch (error: any) {
+      console.error('Error creating item:', error);
+      alert(`Failed to create item: ${JSON.stringify(error)}`);
+    }
   };
   
   const columns: Column<Item>[] = [
     { header: 'Name', accessor: (item: Item) => item.name },
     { header: 'Category', accessor: (item: Item) => item.category?.name },
-    { header: 'Price', accessor: (item: Item) => `$${item.unitPrice.toFixed(2)}` },
+    { header: 'Price', accessor: (item: Item) => `$${Number(item.unitPrice).toFixed(2)}` },
     { header: 'Unit', accessor: (item: Item) => item.unitMeasurement },
     {
       header: 'Actions',
@@ -119,6 +189,25 @@ const Items: React.FC = () => {
       ),
     },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        <p>{error}</p>
+        <Button onClick={() => window.location.reload()} className="mt-4">
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -159,7 +248,7 @@ const Items: React.FC = () => {
               <Select
                 label="Category Filter"
                 name="categoryFilter"
-                options={CATEGORY_OPTIONS}
+                options={categoryOptions}
                 onChange={() => {}}
                 value=""
               />
@@ -188,8 +277,10 @@ const Items: React.FC = () => {
           <Input
             label="Item Name"
             name="name"
-            value={selectedItem?.name || ''}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setSelectedItem(prev => prev ? { ...prev, name: e.target.value } : null)}
+            value={formState.name}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => 
+              setFormState(prev => ({ ...prev, name: e.target.value }))
+            }
             placeholder="Enter item name"
             required
           />
@@ -200,8 +291,10 @@ const Items: React.FC = () => {
               name="unitPrice"
               type="number"
               step="0.01"
-              value={selectedItem?.unitPrice || ''}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setSelectedItem(prev => prev ? { ...prev, unitPrice: parseFloat(e.target.value) } : null)}
+              value={formState.unitPrice}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                setFormState(prev => ({ ...prev, unitPrice: e.target.value }))
+              }
               placeholder="0.00"
               required
             />
@@ -209,8 +302,10 @@ const Items: React.FC = () => {
             <Select
               label="Unit Measurement"
               name="unitMeasurement"
-              value={selectedItem?.unitMeasurement || ''}
-              onChange={(value: string) => setSelectedItem(prev => prev ? { ...prev, unitMeasurement: value } : null)}
+              value={formState.unitMeasurement}
+              onChange={(value: string) => 
+                setFormState(prev => ({ ...prev, unitMeasurement: value }))
+              }
               required
               options={UNIT_OPTIONS}
             />
@@ -219,17 +314,21 @@ const Items: React.FC = () => {
           <Select
             label="Category"
             name="category"
-            value={selectedItem?.categoryId || ''}
-            onChange={(value: string) => setSelectedItem(prev => prev ? { ...prev, categoryId: value } : null)}
+            value={formState.categoryId}
+            onChange={(value: string) => 
+              setFormState(prev => ({ ...prev, categoryId: value }))
+            }
             required
-            options={CATEGORY_OPTIONS.slice(1)}
+            options={categoryOptions.slice(1)}
           />
           
           <TextArea
             label="Description"
             name="description"
-            value={selectedItem?.description || ''}
-            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setSelectedItem(prev => prev ? { ...prev, description: e.target.value } : null)}
+            value={formState.description}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
+              setFormState(prev => ({ ...prev, description: e.target.value }))
+            }
             placeholder="Enter item description"
             rows={3}
           />
